@@ -38,12 +38,13 @@ function fmtTime(s: number) {
 /* ── 5-Slider Dimensions ── */
 const DIMENSIONS = [
   { key: "user_intensity", label: "Intensity", low: "Calm", high: "Explosive" },
-  { key: "user_mood",      label: "Mood",      low: "Melancholy", high: "Euphoric" },
-  { key: "user_groove",    label: "Groove",     low: "Stiff", high: "Bouncy" },
-  { key: "user_tone",      label: "Tone",       low: "Dark", high: "Bright" },
-  { key: "user_texture",   label: "Texture",    low: "Minimal", high: "Complex" },
+  { key: "user_mood", label: "Mood", low: "Melancholy", high: "Euphoric" },
+  { key: "user_groove", label: "Groove", low: "Stiff", high: "Bouncy" },
+  { key: "user_tone", label: "Tone", low: "Dark", high: "Bright" },
+  { key: "user_texture", label: "Texture", low: "Minimal", high: "Complex" },
 ] as const;
 
+/* ── Lyrics Visualizer (runs entirely in milliseconds) ── */
 /* ── Lyrics Visualizer (runs entirely in milliseconds) ── */
 function LyricsVisualizer({ lyrics, progressMs }: { lyrics: LyricLine[]; progressMs: number }) {
   if (lyrics.length === 0) {
@@ -54,7 +55,7 @@ function LyricsVisualizer({ lyrics, progressMs }: { lyrics: LyricLine[]; progres
     );
   }
 
-  // STRICT sequential line selection: find the last line whose timeMs <= progressMs
+  // STRICT sequential line selection
   let activeIdx = 0;
   for (let i = 0; i < lyrics.length; i++) {
     if (progressMs >= lyrics[i].timeMs) activeIdx = i;
@@ -67,64 +68,38 @@ function LyricsVisualizer({ lyrics, progressMs }: { lyrics: LyricLine[]; progres
   const visible = lyrics.slice(wStart, wEnd);
 
   return (
-    <div className="relative flex flex-col items-center justify-center gap-6 select-none pointer-events-none">
+    <div className="relative flex flex-col items-center justify-center gap-6 select-none pointer-events-none w-full overflow-hidden">
       <AnimatePresence mode="popLayout">
         {visible.map((l) => {
           const idx = lyrics.indexOf(l);
           const isActive = idx === activeIdx;
           const isPast = idx < activeIdx;
-          const isFuture = idx > activeIdx;
           const dist = Math.abs(idx - activeIdx);
-
-          let targetOpacity = 0;
-          let targetY = 0;
-          let targetBlur = 0;
-          let targetScale = 1;
-
-          if (isActive) {
-            targetOpacity = 1;
-            targetY = 0;
-            targetBlur = 0;
-            targetScale = 1;
-          } else if (isPast) {
-            // Wispy dissolve exit
-            targetOpacity = 0;
-            targetY = -20 - (dist * 10);
-            targetBlur = 8 + (dist * 2);
-            targetScale = 1.05;
-          } else if (isFuture) {
-            // Ethereal emerging
-            targetOpacity = Math.max(0.05, 0.3 - dist * 0.05);
-            targetY = 10 + (dist * 5);
-            targetBlur = 3 + dist;
-            targetScale = 0.95 - (dist * 0.02);
-          }
 
           return (
             <motion.div
               key={`line-${idx}`}
-              layout
-              initial={{ opacity: 0, y: 20, filter: "blur(10px)", scale: 0.9 }}
+              layout="position" // <-- FIXED: Only animate position coordinates, don't distort scale
+              initial={{ opacity: 0, y: 25, filter: "blur(8px)" }}
               animate={{
-                opacity: targetOpacity,
-                y: targetY,
-                filter: `blur(${targetBlur}px)`,
-                scale: targetScale,
+                opacity: isActive ? 1 : isPast ? 0.25 : Math.max(0.06, 0.18 - dist * 0.04),
+                y: 0,
+                filter: isActive ? "blur(0px)" : `blur(${1 + dist}px)`,
+                scale: isActive ? 1 : 0.96 - dist * 0.02,
               }}
-              exit={{ opacity: 0, y: -40, filter: "blur(12px)", scale: 1.1 }}
-              transition={{ 
-                duration: isActive ? 1.0 : 1.2, 
-                ease: isActive ? [0.2, 0.65, 0.3, 0.9] : "easeOut" 
+              exit={{ opacity: 0, y: -25, filter: "blur(8px)" }}
+              transition={{
+                layout: { type: "tween", ease: "easeInOut", duration: 0.4 }, // Clean linear-glide timing
+                opacity: { duration: 0.35 },
+                filter: { duration: 0.35 },
+                scale: { duration: 0.35 }
               }}
-              className="text-center"
+              className="text-center w-full px-4 transform-gpu" // GPU acceleration prevents font pixelation artifacts
             >
-              <span 
-                className={`inline-block tracking-wide font-light transition-all duration-1000 ${
-                  isActive 
-                    ? "text-2xl md:text-4xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" 
-                    : "text-lg md:text-2xl text-white/50"
-                }`}
-              >
+              <span className={`inline-block tracking-wide font-light transition-colors duration-300 max-w-full break-words ${isActive
+                  ? "text-xl md:text-3xl text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] font-normal"
+                  : "text-base md:text-xl text-white/40"
+                }`}>
                 {l.text}
               </span>
             </motion.div>
